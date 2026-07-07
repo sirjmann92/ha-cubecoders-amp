@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.2.0 (2026-07-07)
+
+### Added
+
+- **Instance control.** Each instance now gets a switch entity that starts and
+  stops it through the ADS controller (`ADSModule/StartInstance` /
+  `StopInstance`), which works on stopped instances — so automations can spin
+  servers up on demand. The switch state follows the `running` field from the
+  coordinator and updates optimistically when toggled.
+- **Restart button** per instance (only available while the instance is
+  running).
+- If AMP refuses an action (`ActionResult.status = False`), the reason is
+  surfaced as a Home Assistant error instead of silently ignored.
+
+### Changed
+
+- Per-instance data now carries the real AMP `instance_name` alongside the
+  friendly name, since control endpoints require the former. Entity unique IDs
+  are unchanged.
+- Sensor/switch/button share a common per-instance entity base
+  (`AmpInstanceEntity`) and device-info builder.
+
+### Notes
+
+- The switch controls the **instance** (the AMP-managed process), not the game
+  application inside it. If the instance is not configured to auto-start its
+  application, starting the instance brings up AMP's management layer but not
+  the game server itself (configure "Start on instance startup" in AMP's
+  instance settings for full spin-up).
+
 ## 1.1.0 (2026-07-07)
 
 ### Fixed

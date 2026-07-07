@@ -1,4 +1,4 @@
-"""Sensor platform for integration_blueprint."""
+"""Sensor platform for the CubeCoders AMP integration."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import AmpBaseInstance
-from .entity import AMPEntity
+from .entity import AmpInstanceEntity, build_device_info
 from .entry import AMPConfigEntry
 
 
@@ -29,11 +29,7 @@ async def async_setup_entry(
     for instance in instances:
         if instance.instance_name == "ADS":
             continue
-        device = DeviceInfo(
-            identifiers={("cubecoders", instance.instance_name)},
-            name=instance.instance_name,
-            manufacturer="CubeCoders",
-        )
+        device = build_device_info(instance)
         sensor_entities = [
             AmpSensor(
                 entry,
@@ -42,7 +38,7 @@ async def async_setup_entry(
                 name="Active Users",
                 key="active_users",
                 icon="mdi:account-group",
-                state_class=SensorStateClass.MEASUREMENT
+                state_class=SensorStateClass.MEASUREMENT,
             ),
             AmpSensor(
                 entry,
@@ -59,7 +55,7 @@ async def async_setup_entry(
                 name="Max Active Users",
                 key="max_active_users",
                 icon="mdi:account-group",
-                state_class=SensorStateClass.MEASUREMENT
+                state_class=SensorStateClass.MEASUREMENT,
             ),
             AmpSensor(
                 entry,
@@ -99,8 +95,8 @@ async def async_setup_entry(
     async_add_entities(all_entities)
 
 
-class AmpSensor(AMPEntity, SensorEntity):
-    """integration_blueprint Sensor class."""
+class AmpSensor(AmpInstanceEntity, SensorEntity):
+    """Sensor exposing one field of an AMP instance."""
 
     def __init__(
         self,
@@ -115,7 +111,7 @@ class AmpSensor(AMPEntity, SensorEntity):
         icon: str | None = None,
     ) -> None:
         """Initialize the sensor class."""
-        super().__init__(entry.runtime_data.coordinator)
+        super().__init__(entry.runtime_data.coordinator, instance, device)
         entity_key = f"{instance.instance_index}_{instance.instance_name}_{key}"
         self.entity_description = SensorEntityDescription(
             key=entity_key,
@@ -124,29 +120,12 @@ class AmpSensor(AMPEntity, SensorEntity):
             device_class=device_class,
             native_unit_of_measurement=native_unit_of_measurement,
             state_class=state_class,
-            # suggested_unit_of_measurement=suggested_unit_of_measurement,
         )
         self.key = key
         self._attr_unique_id = entity_key
-        self.index = instance.instance_index
-        self.device = device
-
-    @property
-    def available(self) -> bool:
-        """Return True if the instance was present in the last update."""
-        return (
-            super().available
-            and self.coordinator.data is not None
-            and self.index in self.coordinator.data
-        )
 
     @property
     def native_value(self) -> str | None:
         """Return the native value of the sensor."""
-        instance = (self.coordinator.data or {}).get(self.index)
+        instance = self.instance_data
         return getattr(instance, self.key) if instance is not None else None
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Returns the device information."""
-        return self.device

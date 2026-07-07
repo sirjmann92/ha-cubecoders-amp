@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 import aiohttp
 from ampapi import ADSModule, AMPInstance, Bridge
-from ampapi.dataclass import APIParams, Instance
+from ampapi.dataclass import ActionResult, APIParams, Instance
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,10 +31,16 @@ class AmpApiClientAuthenticationError(
 
 @dataclass
 class AmpBaseInstance:
-    """Base instance class for AMP."""
+    """Base instance class for AMP.
+
+    instance_name is the friendly (display) name and is part of entity unique
+    ids; amp_instance_name is the real AMP instance name, which is what the
+    ADSModule start/stop/restart endpoints expect.
+    """
 
     instance_name: str
     instance_index: int
+    amp_instance_name: str
 
 
 @dataclass
@@ -87,9 +93,48 @@ class AmpApiClient:
             AmpBaseInstance(
                 instance_name=instance.friendly_name,
                 instance_index=index,
+                amp_instance_name=instance.instance_name,
             )
             for index, instance in enumerate(instances)
         ]
+
+    async def async_start_instance(self, amp_instance_name: str) -> None:
+        """Start an instance via the ADS controller (works on stopped instances)."""
+        await self._async_instance_action("start", amp_instance_name)
+
+    async def async_stop_instance(self, amp_instance_name: str) -> None:
+        """Stop an instance via the ADS controller."""
+        await self._async_instance_action("stop", amp_instance_name)
+
+    async def async_restart_instance(self, amp_instance_name: str) -> None:
+        """Restart an instance via the ADS controller."""
+        await self._async_instance_action("restart", amp_instance_name)
+
+    async def _async_instance_action(self, action: str, amp_instance_name: str) -> None:
+        """Run an ADS-level start/stop/restart action on an instance."""
+        try:
+            result = await getattr(self.ads, f"{action}_instance")(
+                instance_name=amp_instance_name, format_data=True
+            )
+        except PermissionError as exception:
+            msg = f"Authentication failed - {exception}"
+            raise AmpApiClientAuthenticationError(msg) from exception
+        except (
+            aiohttp.ClientError,
+            socket.gaierror,
+            ConnectionError,
+            TimeoutError,
+            ValueError,
+        ) as exception:
+            msg = f"Failed to {action} instance {amp_instance_name} - {exception}"
+            raise AmpApiClientCommunicationError(msg) from exception
+
+        if isinstance(result, ActionResult) and result.status is False:
+            msg = (
+                f"AMP refused to {action} instance {amp_instance_name}:"
+                f" {result.reason or 'no reason given'}"
+            )
+            raise AmpApiClientError(msg)
 
     async def async_get_data(self) -> dict[int, AmpExtendedInstance]:
         """Get data from the API for every instance.
@@ -131,6 +176,7 @@ class AmpApiClient:
         data = AmpExtendedInstance(
             instance_name=instance.friendly_name,
             instance_index=key,
+            amp_instance_name=instance.instance_name,
             active_users=(
                 metrics.active_users.get("raw_value", 0)
                 if metrics and metrics.active_users
