@@ -25,6 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AMPConfigEntry) -> bool:
         hass=hass,
         logger=LOGGER,
         name="cubecoders",
+        config_entry=entry,
         update_interval=timedelta(minutes=1),
     )
 

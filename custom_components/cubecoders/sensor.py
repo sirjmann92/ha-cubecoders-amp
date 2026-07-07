@@ -132,9 +132,19 @@ class AmpSensor(AMPEntity, SensorEntity):
         self.device = device
 
     @property
+    def available(self) -> bool:
+        """Return True if the instance was present in the last update."""
+        return (
+            super().available
+            and self.coordinator.data is not None
+            and self.index in self.coordinator.data
+        )
+
+    @property
     def native_value(self) -> str | None:
         """Return the native value of the sensor."""
-        return getattr(self.coordinator.data[self.index], self.key)
+        instance = (self.coordinator.data or {}).get(self.index)
+        return getattr(instance, self.key) if instance is not None else None
 
     @property
     def device_info(self) -> DeviceInfo:

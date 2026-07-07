@@ -10,6 +10,6 @@
   "issue_tracker":  "https://github.com/Samywamy10/ha-cubecoders-amp/issues",
   "requirements": ["cc-ampapi==1.1.2", "dataclass-wizard==0.34.0"],
   "ssdp": [],
-  "version": "1.0.0",
+  "version": "1.1.0",
   "zeroconf": []
 }

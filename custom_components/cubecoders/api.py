@@ -1,15 +1,16 @@
-"""Sample API Client."""
+"""AMP API Client."""
 
 from __future__ import annotations
 
-from asyncio.timeouts import timeout
-from dataclasses import dataclass
+import logging
 import socket
-from typing import Any
+from dataclasses import dataclass
 
 import aiohttp
 from ampapi import ADSModule, AMPInstance, Bridge
-from ampapi.dataclass import APIParams
+from ampapi.dataclass import APIParams, Instance
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class AmpApiClientError(Exception):
@@ -41,16 +42,17 @@ class AmpExtendedInstance(AmpBaseInstance):
     """Represents an extended instance of AMP (Application Management Panel)."""
 
     active_users: int
-    players: str
+    players: str | None
     max_active_users: int
     cpu_usage_percentage: int
     memory_usage_mb: int
     app_state: str
-    address: str
+    address: str | None
+    running: bool
 
 
 class AmpApiClient:
-    """Sample API Client."""
+    """AMP API Client."""
 
     def __init__(
         self,
@@ -58,7 +60,7 @@ class AmpApiClient:
         password: str,
         host: str,
     ) -> None:
-        """Sample API Client."""
+        """AMP API Client."""
         self._username = username
         self._password = password
         self._host = host
@@ -90,88 +92,89 @@ class AmpApiClient:
         ]
 
     async def async_get_data(self) -> dict[int, AmpExtendedInstance]:
-        """Get data from the API."""
+        """Get data from the API for every instance.
 
-        all_instances = (await self.ads.get_instances())[0].available_instances
-        data = {}
-        for key, instance in enumerate(all_instances):
-            instance_data = AMPInstance(instance)
-            players_raw = (await instance_data.get_user_list()).sorted
-            players = (
-                ", ".join(player.name for player in players_raw)
-                if players_raw
+        A stopped or unreachable instance must never fail the whole refresh:
+        stopped instances are populated from the get_instances() payload only,
+        and any per-instance error degrades to that same baseline data.
+        """
+        try:
+            all_instances = (await self.ads.get_instances())[0].available_instances
+        except PermissionError as exception:
+            msg = f"Authentication failed - {exception}"
+            raise AmpApiClientAuthenticationError(msg) from exception
+        except (
+            aiohttp.ClientError,
+            socket.gaierror,
+            ConnectionError,
+            TimeoutError,
+            ValueError,
+        ) as exception:
+            msg = f"Error fetching instance list - {exception}"
+            raise AmpApiClientCommunicationError(msg) from exception
+
+        return {
+            key: await self._async_get_instance_data(key, instance)
+            for key, instance in enumerate(all_instances)
+        }
+
+    async def _async_get_instance_data(
+        self, key: int, instance: Instance
+    ) -> AmpExtendedInstance:
+        """Build the data for a single instance.
+
+        get_instances() already includes state, metrics and endpoints for every
+        instance; only the player list requires a live API call, which AMP
+        rejects with "instance not available" unless the instance is running.
+        """
+        metrics = instance.metrics
+        data = AmpExtendedInstance(
+            instance_name=instance.friendly_name,
+            instance_index=key,
+            active_users=(
+                metrics.active_users.get("raw_value", 0)
+                if metrics and metrics.active_users
+                else 0
+            ),
+            players=None,
+            max_active_users=(
+                metrics.active_users.get("max_value", 0)
+                if metrics and metrics.active_users
+                else 0
+            ),
+            cpu_usage_percentage=(
+                metrics.cpu_usage.get("raw_value", 0)
+                if metrics and metrics.cpu_usage
+                else 0
+            ),
+            memory_usage_mb=(
+                metrics.memory_usage.get("raw_value", 0)
+                if metrics and metrics.memory_usage
+                else 0
+            ),
+            app_state=instance.app_state.name,
+            address=(
+                instance.application_endpoints[0]["endpoint"]
+                if instance.application_endpoints
                 else None
-            )
-            active_users = (
-                instance_data.metrics.active_users.get("raw_value", 0)
-                if instance_data.metrics.active_users
-                else 0
-            )
-            max_active_users = (
-                instance_data.metrics.active_users.get("max_value", 0)
-                if instance_data.metrics.active_users
-                else 0
-            )
-            cpu_usage_percentage = (
-                instance_data.metrics.cpu_usage.get("raw_value", 0)
-                if instance_data.metrics.cpu_usage
-                else 0
-            )
-            memory_usage_mb = (
-                instance_data.metrics.memory_usage.get("raw_value", 0)
-                if instance_data.metrics.memory_usage
-                else 0
-            )
-            app_state = instance_data.app_state.name
-            address = instance_data.application_endpoints[0]["endpoint"]
-            data[key] = AmpExtendedInstance(
-                instance_name=instance.friendly_name,
-                instance_index=key,
-                active_users=active_users,
-                players=players,
-                max_active_users=max_active_users,
-                cpu_usage_percentage=cpu_usage_percentage,
-                memory_usage_mb=memory_usage_mb,
-                app_state=app_state,
-                address=address,
-            )
-        return data
-
-    async def async_set_title(self, value: str) -> Any:
-        """Get data from the API."""
-        return await self._api_wrapper(
-            method="patch",
-            url="https://jsonplaceholder.typicode.com/posts/1",
-            data={"title": value},
-            headers={"Content-type": "application/json; charset=UTF-8"},
+            ),
+            running=instance.running,
         )
 
-    async def _api_wrapper(
-        self,
-        method: str,
-        url: str,
-        data: dict | None = None,
-        headers: dict | None = None,
-    ) -> Any:
-        """Get information from the API."""
-        try:
-            async with timeout(10):
-                instances = await self.ads.get_instances()
-                instance: AMPInstance = AMPInstance(instances[1])
-                return instance.metrics.active_users.raw_value
+        if not instance.running:
+            return data
 
-        except TimeoutError as exception:
-            msg = f"Timeout error fetching information - {exception}"
-            raise AmpApiClientCommunicationError(
-                msg,
-            ) from exception
-        except (aiohttp.ClientError, socket.gaierror) as exception:
-            msg = f"Error fetching information - {exception}"
-            raise AmpApiClientCommunicationError(
-                msg,
-            ) from exception
-        except Exception as exception:
-            msg = f"Something really wrong happened! - {exception}"
-            raise AmpApiClientError(
-                msg,
-            ) from exception
+        try:
+            players_raw = (await AMPInstance(instance).get_user_list()).sorted
+        except Exception:  # noqa: BLE001 - one bad instance must not fail the refresh
+            _LOGGER.warning(
+                "Could not fetch the player list for instance %s;"
+                " reporting it without player data",
+                instance.friendly_name,
+                exc_info=True,
+            )
+            return data
+
+        if players_raw:
+            data.players = ", ".join(player.name for player in players_raw)
+        return data
