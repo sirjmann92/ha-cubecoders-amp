@@ -98,6 +98,23 @@ async def async_setup_entry(
                 icon="mdi:package-up",
                 entity_category=EntityCategory.DIAGNOSTIC,
             ),
+            AmpSensor(
+                entry,
+                instance,
+                device,
+                name="Uptime",
+                key="uptime",
+                icon="mdi:timer-outline",
+            ),
+            AmpSensor(
+                entry,
+                instance,
+                device,
+                name="Empty Since",
+                key="empty_since",
+                device_class=SensorDeviceClass.TIMESTAMP,
+                icon="mdi:account-off",
+            ),
         ]
         all_entities.extend(sensor_entities)
 

@@ -15,6 +15,10 @@ from .entity import AmpInstanceEntity, build_device_info
 from .entry import AMPConfigEntry
 
 
+# App states that mean the application is up or on its way up/down.
+ACTIVE_APP_STATES = {"starting", "ready", "restarting", "stopping"}
+
+
 async def async_setup_entry(
     hass: HomeAssistant,  # noqa: ARG001 Unused function argument: `hass`
     entry: AMPConfigEntry,
@@ -22,11 +26,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up the switch platform."""
     instances = await entry.runtime_data.client.async_get_instances()
-    async_add_entities(
-        AmpInstanceSwitch(entry, instance, build_device_info(instance))
-        for instance in instances
-        if instance.instance_name != "ADS"
-    )
+    entities: list[SwitchEntity] = []
+    for instance in instances:
+        if instance.instance_name == "ADS":
+            continue
+        device = build_device_info(instance)
+        entities.append(AmpInstanceSwitch(entry, instance, device))
+        entities.append(AmpApplicationSwitch(entry, instance, device))
+    async_add_entities(entities)
 
 
 class AmpInstanceSwitch(AmpInstanceEntity, SwitchEntity):
@@ -77,5 +84,61 @@ class AmpInstanceSwitch(AmpInstanceEntity, SwitchEntity):
         data = self.instance_data
         if data is not None:
             data.running = running
+            self.coordinator.async_set_updated_data(self.coordinator.data)
+        await self.coordinator.async_request_refresh()
+
+
+class AmpApplicationSwitch(AmpInstanceEntity, SwitchEntity):
+    """Switch that starts/stops the application (game server) inside an instance."""
+
+    _attr_device_class = SwitchDeviceClass.SWITCH
+    _attr_icon = "mdi:gamepad-variant"
+
+    def __init__(
+        self,
+        entry: AMPConfigEntry,
+        instance: AmpBaseInstance,
+        device: DeviceInfo,
+    ) -> None:
+        """Initialize the application switch."""
+        super().__init__(entry.runtime_data.coordinator, instance, device)
+        self._client = entry.runtime_data.client
+        self._attr_unique_id = (
+            f"{instance.instance_index}_{instance.instance_name}_application_running"
+        )
+        self._attr_name = f"{instance.instance_name} Application"
+
+    @property
+    def available(self) -> bool:
+        """The application can only be controlled while the instance is running."""
+        data = self.instance_data
+        return super().available and data is not None and data.running
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if the application is running (or transitioning)."""
+        data = self.instance_data
+        return data.app_state in ACTIVE_APP_STATES if data is not None else None
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Start the application."""
+        await self._async_set_app_running(running=True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Stop the application."""
+        await self._async_set_app_running(running=False)
+
+    async def _async_set_app_running(self, *, running: bool) -> None:
+        try:
+            if running:
+                await self._client.async_start_application(self.amp_instance_name)
+            else:
+                await self._client.async_stop_application(self.amp_instance_name)
+        except AmpApiClientError as exception:
+            raise HomeAssistantError(str(exception)) from exception
+
+        data = self.instance_data
+        if data is not None:
+            data.app_state = "starting" if running else "stopping"
             self.coordinator.async_set_updated_data(self.coordinator.data)
         await self.coordinator.async_request_refresh()

@@ -13,6 +13,7 @@ from .api import AmpApiClient
 from .coordinator import AmpDataUpdateCoordinator
 from .data import AmpData
 from .entry import AMPConfigEntry
+from .services import async_setup_services, async_unload_services
 
 _PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -46,10 +47,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: AMPConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
     await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
+    async_setup_services(hass)
 
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: AMPConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, _PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, _PLATFORMS)
+    if unload_ok and not any(
+        other.entry_id != entry.entry_id
+        for other in hass.config_entries.async_loaded_entries(entry.domain)
+    ):
+        async_unload_services(hass)
+    return unload_ok

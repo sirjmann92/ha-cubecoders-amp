@@ -1,0 +1,69 @@
+send_command:
+  name: Send console command
+  description: >-
+    Send a command to a running instance's console (e.g. save-all, an
+    in-game announcement, or any command you would type into the AMP console).
+  fields:
+    instance:
+      name: Instance
+      description: Friendly or AMP name of the instance (case-insensitive).
+      required: true
+      example: Enshrouded
+      selector:
+        text:
+    command:
+      name: Command
+      description: The console command to send.
+      required: true
+      example: "say Server restarting in 5 minutes!"
+      selector:
+        text:
+
+mc_kick_player:
+  name: Kick Minecraft player
+  description: Kick a player from a running Minecraft instance (by player name).
+  fields: &mc_player_fields
+    instance:
+      name: Instance
+      description: Friendly or AMP name of the Minecraft instance.
+      required: true
+      example: Minecraft
+      selector:
+        text:
+    player:
+      name: Player
+      description: The player's name (case-insensitive).
+      required: true
+      example: Steve
+      selector:
+        text:
+
+mc_ban_player:
+  name: Ban Minecraft player
+  description: Ban a currently-online player from a running Minecraft instance.
+  fields: *mc_player_fields
+
+mc_smite_player:
+  name: Smite Minecraft player
+  description: Strike a currently-online player with lightning. For justice.
+  fields: *mc_player_fields
+
+mc_whitelist_add:
+  name: Add to Minecraft whitelist
+  description: Add a player to a running Minecraft instance's whitelist.
+  fields: *mc_player_fields
+
+mc_whitelist_remove:
+  name: Remove from Minecraft whitelist
+  description: Remove a player from a running Minecraft instance's whitelist.
+  fields: *mc_player_fields
+
+mc_op_player:
+  name: Op Minecraft player
+  description: Grant operator status to a player on a running Minecraft instance.
+  fields: *mc_player_fields
+
+mc_deop_player:
+  name: De-op Minecraft player
+  description: Revoke operator status from a player on a running Minecraft instance.
+  fields: *mc_player_fields

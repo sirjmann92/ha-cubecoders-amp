@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.4.0 (2026-07-07)
+
+### Added
+
+- **Application switch** per instance — starts/stops the game server inside a
+  running instance (`start_application`/`stop_application`), complementing the
+  instance-level switch.
+- **Restart Application** and **Update Game Server** buttons per instance (the
+  latter triggers AMP's SteamCMD/application update via
+  `ADSModule/UpgradeInstance`).
+- **`cubecoders.send_command` service** — send any console command to a
+  running instance (announcements, save-all, etc.). Accepts the friendly or
+  AMP instance name, case-insensitively.
+- **Minecraft player services**: `mc_kick_player`, `mc_ban_player`,
+  `mc_smite_player`, `mc_whitelist_add`, `mc_whitelist_remove`,
+  `mc_op_player`, `mc_deop_player`. All take a plain player name — for
+  kick/ban/smite the required UUID is resolved from the live player list.
+- **Player events**: `cubecoders_player_joined` / `cubecoders_player_left`
+  fired on the HA event bus when the polled player list changes (suppressed on
+  the first refresh after a restart).
+- **Uptime sensor** per instance (from the live instance status).
+- **Empty Since sensor** per instance — timestamp of when a running instance
+  last became empty; clears when players are present or the instance stops.
+  Built for "stop the server after it's been empty for X minutes" automations.
+- README: voice-assistant and automation examples.
+
+### Changed
+
+- Internal: shared error-mapping wrapper for all ampapi calls; instance
+  buttons consolidated into one parameterized class (existing unique IDs
+  unchanged).
+
 ## 1.3.1 (2026-07-07)
 
 ### Changed

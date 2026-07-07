@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 import socket
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime  # noqa: TC003 - used in dataclass field annotation
 
 import aiohttp
 from ampapi import ADSModule, AMPInstance, Bridge, Core
@@ -13,8 +14,10 @@ from ampapi.dataclass import (
     APIParams,
     Instance,
     UpdateInfo,
+    Updates,
     VersionInfo,
 )
+from ampapi.instance import AMPMinecraftInstance
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,6 +65,11 @@ class AmpExtendedInstance(AmpBaseInstance):
     address: str | None
     running: bool
     amp_version: str | None
+    module: str
+    player_list: list[str] = field(default_factory=list)
+    uptime: str | None = None
+    # Set by the coordinator, which compares consecutive refreshes.
+    empty_since: datetime | None = None
 
 
 @dataclass
@@ -146,12 +154,115 @@ class AmpApiClient:
         """Restart an instance via the ADS controller."""
         await self._async_instance_action("restart", amp_instance_name)
 
+    async def async_upgrade_instance(self, amp_instance_name: str) -> None:
+        """Update the game server (SteamCMD/app update) via the ADS controller."""
+        await self._async_instance_action("upgrade", amp_instance_name)
+
     async def _async_instance_action(self, action: str, amp_instance_name: str) -> None:
-        """Run an ADS-level start/stop/restart action on an instance."""
-        try:
-            result = await getattr(self.ads, f"{action}_instance")(
+        """Run an ADS-level start/stop/restart/upgrade action on an instance."""
+        await self._async_call(
+            getattr(self.ads, f"{action}_instance")(
                 instance_name=amp_instance_name, format_data=True
+            ),
+            action=f"{action} instance",
+            target=amp_instance_name,
+        )
+
+    async def async_start_application(self, instance_name: str) -> None:
+        """Start the application (game server) inside a running instance."""
+        live_instance = await self._async_get_live_instance(instance_name)
+        await self._async_call(
+            live_instance.start_application(format_data=True),
+            action="start application",
+            target=instance_name,
+        )
+
+    async def async_stop_application(self, instance_name: str) -> None:
+        """Stop the application (game server) inside a running instance."""
+        live_instance = await self._async_get_live_instance(instance_name)
+        await self._async_call(
+            live_instance.stop_application(),
+            action="stop application",
+            target=instance_name,
+        )
+
+    async def async_restart_application(self, instance_name: str) -> None:
+        """Restart the application (game server) inside a running instance."""
+        live_instance = await self._async_get_live_instance(instance_name)
+        await self._async_call(
+            live_instance.restart_application(format_data=True),
+            action="restart application",
+            target=instance_name,
+        )
+
+    async def async_send_console_command(self, instance_name: str, command: str) -> None:
+        """Send a console command/message to a running instance's application."""
+        live_instance = await self._async_get_live_instance(instance_name)
+        await self._async_call(
+            live_instance.send_console_message(command),
+            action="send console command",
+            target=instance_name,
+        )
+
+    # Minecraft actions that require the player's full UUID; resolved from the
+    # live player list so callers can pass a plain player name.
+    _MC_UUID_ACTIONS = {
+        "kick": "mc_kick_user_by_id",
+        "ban": "mc_ban_user_by_id",
+        "smite": "mc_smite_by_id",
+    }
+    # Minecraft actions that accept a player name (or UUID) directly.
+    _MC_NAME_ACTIONS = {
+        "whitelist_add": "mc_add_to_whitelist",
+        "whitelist_remove": "mc_remove_whitelist_entry",
+        "op": "mc_add_op_entry",
+        "deop": "mc_remove_op_entry",
+    }
+
+    async def async_mc_player_action(
+        self, instance_name: str, action: str, player: str
+    ) -> None:
+        """Run a Minecraft player action (kick/ban/smite/whitelist/op) on an instance."""
+        live_instance = await self._async_get_live_instance(instance_name)
+        if not isinstance(live_instance, AMPMinecraftInstance):
+            msg = f"Instance '{instance_name}' is not a Minecraft instance"
+            raise AmpApiClientError(msg)
+
+        if action in self._MC_UUID_ACTIONS:
+            players = (
+                await self._async_call(
+                    live_instance.get_user_list(),
+                    action="list players",
+                    target=instance_name,
+                )
+            ).sorted
+            match = next(
+                (p for p in players if p.name.lower() == player.lower()), None
             )
+            if match is None:
+                msg = f"Player '{player}' is not online on '{instance_name}'"
+                raise AmpApiClientError(msg)
+            method = getattr(live_instance, self._MC_UUID_ACTIONS[action])
+            await self._async_call(
+                method(match.uuid), action=action, target=instance_name
+            )
+        elif action in self._MC_NAME_ACTIONS:
+            method = getattr(live_instance, self._MC_NAME_ACTIONS[action])
+            await self._async_call(
+                method(player), action=action, target=instance_name
+            )
+        else:
+            msg = f"Unknown Minecraft action '{action}'"
+            raise AmpApiClientError(msg)
+
+    async def _async_get_live_instance(self, instance_name: str) -> AMPInstance:
+        """Look up a running instance by friendly or AMP name (case-insensitive).
+
+        Returns an AMPMinecraftInstance for Minecraft instances so the mc_*
+        endpoints are available.
+        """
+        try:
+            all_instances = (await self.ads.get_instances())[0].available_instances
         except PermissionError as exception:
             msg = f"Authentication failed - {exception}"
             raise AmpApiClientAuthenticationError(msg) from exception
@@ -162,15 +273,57 @@ class AmpApiClient:
             TimeoutError,
             ValueError,
         ) as exception:
-            msg = f"Failed to {action} instance {amp_instance_name} - {exception}"
+            msg = f"Error fetching instance list - {exception}"
+            raise AmpApiClientCommunicationError(msg) from exception
+
+        wanted = instance_name.strip().lower()
+        match = next(
+            (
+                instance
+                for instance in all_instances
+                if wanted
+                in (instance.friendly_name.lower(), instance.instance_name.lower())
+            ),
+            None,
+        )
+        if match is None:
+            msg = f"No AMP instance named '{instance_name}'"
+            raise AmpApiClientError(msg)
+        if not match.running:
+            msg = f"Instance '{instance_name}' is not running"
+            raise AmpApiClientError(msg)
+        cls = AMPMinecraftInstance if match.module == "Minecraft" else AMPInstance
+        return cls(match)
+
+    async def _async_call(self, coro, action: str, target: str):  # noqa: ANN001, ANN202
+        """Await an ampapi call, mapping errors and refused ActionResults."""
+        try:
+            result = await coro
+        except PermissionError as exception:
+            msg = f"Authentication failed - {exception}"
+            raise AmpApiClientAuthenticationError(msg) from exception
+        except RuntimeError as exception:
+            # ampapi raises RuntimeError for wrong-module calls (e.g. mc_* on
+            # a non-Minecraft instance).
+            msg = f"Cannot {action} for {target}: {exception}"
+            raise AmpApiClientError(msg) from exception
+        except (
+            aiohttp.ClientError,
+            socket.gaierror,
+            ConnectionError,
+            TimeoutError,
+            ValueError,
+        ) as exception:
+            msg = f"Failed to {action} for {target} - {exception}"
             raise AmpApiClientCommunicationError(msg) from exception
 
         if isinstance(result, ActionResult) and result.status is False:
             msg = (
-                f"AMP refused to {action} instance {amp_instance_name}:"
+                f"AMP refused to {action} for {target}:"
                 f" {result.reason or 'no reason given'}"
             )
             raise AmpApiClientError(msg)
+        return result
 
     async def async_get_data(self) -> AmpCoordinatorData:
         """Get data from the API for every instance, plus panel-level info.
@@ -272,13 +425,15 @@ class AmpApiClient:
             ),
             running=instance.running,
             amp_version=format_amp_version(instance.amp_version),
+            module=instance.module,
         )
 
         if not instance.running:
             return data
 
+        live_instance = AMPInstance(instance)
         try:
-            players_raw = (await AMPInstance(instance).get_user_list()).sorted
+            players_raw = (await live_instance.get_user_list()).sorted
         except ConnectionError:
             # Expected while an instance is starting/installing: the instance
             # is up but its application cannot answer user-list calls yet.
@@ -286,7 +441,6 @@ class AmpApiClient:
                 "Instance %s is not ready to report a player list",
                 instance.friendly_name,
             )
-            return data
         except Exception:  # noqa: BLE001 - one bad instance must not fail the refresh
             _LOGGER.warning(
                 "Could not fetch the player list for instance %s;"
@@ -294,8 +448,20 @@ class AmpApiClient:
                 instance.friendly_name,
                 exc_info=True,
             )
-            return data
+        else:
+            if players_raw:
+                data.player_list = [player.name for player in players_raw]
+                data.players = ", ".join(data.player_list)
 
-        if players_raw:
-            data.players = ", ".join(player.name for player in players_raw)
+        try:
+            updates = await live_instance.get_updates(format_data=True)
+        except Exception:  # noqa: BLE001 - uptime is nice-to-have, never fail on it
+            _LOGGER.debug(
+                "Could not fetch live status for instance %s",
+                instance.friendly_name,
+            )
+        else:
+            if isinstance(updates, Updates) and updates.status is not None:
+                data.uptime = updates.status.uptime or None
+
         return data
