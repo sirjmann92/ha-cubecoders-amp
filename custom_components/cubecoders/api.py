@@ -7,8 +7,14 @@ import socket
 from dataclasses import dataclass
 
 import aiohttp
-from ampapi import ADSModule, AMPInstance, Bridge
-from ampapi.dataclass import ActionResult, APIParams, Instance
+from ampapi import ADSModule, AMPInstance, Bridge, Core
+from ampapi.dataclass import (
+    ActionResult,
+    APIParams,
+    Instance,
+    UpdateInfo,
+    VersionInfo,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,6 +61,34 @@ class AmpExtendedInstance(AmpBaseInstance):
     app_state: str
     address: str | None
     running: bool
+    amp_version: str | None
+
+
+@dataclass
+class AmpPanelUpdate:
+    """AMP panel update availability, from Core/GetUpdateInfo."""
+
+    update_available: bool
+    version: str | None
+    release_notes_url: str | None
+
+
+@dataclass
+class AmpCoordinatorData:
+    """Everything one coordinator refresh collects."""
+
+    instances: dict[int, AmpExtendedInstance]
+    panel_version: str | None
+    panel_update: AmpPanelUpdate | None
+
+
+def format_amp_version(version: VersionInfo | str | dict | None) -> str | None:
+    """Render the amp_version field (VersionInfo dataclass or string) as a string."""
+    if version is None:
+        return None
+    if isinstance(version, VersionInfo):
+        return f"{version.major}.{version.minor}.{version.revision}.{version.minor_revision}"
+    return str(version)
 
 
 class AmpApiClient:
@@ -77,6 +111,8 @@ class AmpApiClient:
         )
         Bridge(api_params=params)  # stores params statically so available globally
         self.ads: ADSModule = ADSModule()
+        # instance_id defaults to "0", which targets the panel/controller itself.
+        self.core: Core = Core()
 
     async def async_get_instances(self) -> list[AmpBaseInstance]:
         """Asynchronously retrieves a list of AMP base instances.
@@ -136,8 +172,8 @@ class AmpApiClient:
             )
             raise AmpApiClientError(msg)
 
-    async def async_get_data(self) -> dict[int, AmpExtendedInstance]:
-        """Get data from the API for every instance.
+    async def async_get_data(self) -> AmpCoordinatorData:
+        """Get data from the API for every instance, plus panel-level info.
 
         A stopped or unreachable instance must never fail the whole refresh:
         stopped instances are populated from the get_instances() payload only,
@@ -158,10 +194,38 @@ class AmpApiClient:
             msg = f"Error fetching instance list - {exception}"
             raise AmpApiClientCommunicationError(msg) from exception
 
-        return {
+        instances = {
             key: await self._async_get_instance_data(key, instance)
             for key, instance in enumerate(all_instances)
         }
+        panel_version = next(
+            (
+                format_amp_version(instance.amp_version)
+                for instance in all_instances
+                if instance.module == "ADS" or instance.friendly_name == "ADS"
+            ),
+            None,
+        )
+        return AmpCoordinatorData(
+            instances=instances,
+            panel_version=panel_version,
+            panel_update=await self._async_get_panel_update(),
+        )
+
+    async def _async_get_panel_update(self) -> AmpPanelUpdate | None:
+        """Fetch AMP panel update availability; None if it cannot be determined."""
+        try:
+            result = await self.core.get_update_info(format_data=True)
+        except Exception:  # noqa: BLE001 - purely informational, never fail the refresh
+            _LOGGER.debug("Could not fetch AMP panel update info", exc_info=True)
+            return None
+        if not isinstance(result, UpdateInfo):
+            return None
+        return AmpPanelUpdate(
+            update_available=result.update_available,
+            version=result.version or None,
+            release_notes_url=result.release_notes_url or None,
+        )
 
     async def _async_get_instance_data(
         self, key: int, instance: Instance
@@ -198,13 +262,16 @@ class AmpApiClient:
                 if metrics and metrics.memory_usage
                 else 0
             ),
-            app_state=instance.app_state.name,
+            # AMP reports app_state "undefined" (-1) for instances that are not
+            # running; "stopped" matches what AMP's own UI shows.
+            app_state=instance.app_state.name if instance.running else "stopped",
             address=(
                 instance.application_endpoints[0]["endpoint"]
                 if instance.application_endpoints
                 else None
             ),
             running=instance.running,
+            amp_version=format_amp_version(instance.amp_version),
         )
 
         if not instance.running:
@@ -212,6 +279,14 @@ class AmpApiClient:
 
         try:
             players_raw = (await AMPInstance(instance).get_user_list()).sorted
+        except ConnectionError:
+            # Expected while an instance is starting/installing: the instance
+            # is up but its application cannot answer user-list calls yet.
+            _LOGGER.debug(
+                "Instance %s is not ready to report a player list",
+                instance.friendly_name,
+            )
+            return data
         except Exception:  # noqa: BLE001 - one bad instance must not fail the refresh
             _LOGGER.warning(
                 "Could not fetch the player list for instance %s;"

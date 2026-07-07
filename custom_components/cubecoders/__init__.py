@@ -14,7 +14,12 @@ from .coordinator import AmpDataUpdateCoordinator
 from .data import AmpData
 from .entry import AMPConfigEntry
 
-_PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
+_PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.BUTTON,
+    Platform.UPDATE,
+]
 LOGGER: Logger = getLogger(__package__)
 
 

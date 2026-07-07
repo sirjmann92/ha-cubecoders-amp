@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.3.0 (2026-07-07)
+
+### Added
+
+- **AMP Panel update entity.** A new "AMP Panel" device with a Home Assistant
+  `update` entity showing the installed AMP version (from the ADS controller)
+  and, via `Core/GetUpdateInfo`, whether a newer AMP version is available —
+  including a release-notes link. Appears in Settings → Updates when an AMP
+  upgrade is pending. Display-only; installing from HA is intentionally not
+  supported. Update-info failures never affect the rest of the refresh.
+- **AMP Version diagnostic sensor** per instance, from the instance's
+  `amp_version` field.
+
+### Changed
+
+- Stopped instances now report app state `stopped` instead of `undefined`
+  (AMP returns state -1 for non-running instances; "stopped" matches AMP's own
+  UI).
+- The "instance not ready to report a player list" case (e.g. while an
+  application is starting or installing) is now logged at debug level without
+  a traceback; unexpected per-instance errors still log a warning.
+- Coordinator data is now a structured object (`AmpCoordinatorData`) carrying
+  per-instance data plus panel-level version/update info.
+
 ## 1.2.0 (2026-07-07)
 
 ### Added

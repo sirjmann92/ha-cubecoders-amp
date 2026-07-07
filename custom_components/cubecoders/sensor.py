@@ -8,7 +8,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfInformation
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfInformation
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -89,6 +89,15 @@ async def async_setup_entry(
                 name="Address",
                 key="address",
             ),
+            AmpSensor(
+                entry,
+                instance,
+                device,
+                name="AMP Version",
+                key="amp_version",
+                icon="mdi:package-up",
+                entity_category=EntityCategory.DIAGNOSTIC,
+            ),
         ]
         all_entities.extend(sensor_entities)
 
@@ -109,6 +118,7 @@ class AmpSensor(AmpInstanceEntity, SensorEntity):
         state_class: SensorStateClass | None = None,
         native_unit_of_measurement: str | None = None,
         icon: str | None = None,
+        entity_category: EntityCategory | None = None,
     ) -> None:
         """Initialize the sensor class."""
         super().__init__(entry.runtime_data.coordinator, instance, device)
@@ -120,6 +130,7 @@ class AmpSensor(AmpInstanceEntity, SensorEntity):
             device_class=device_class,
             native_unit_of_measurement=native_unit_of_measurement,
             state_class=state_class,
+            entity_category=entity_category,
         )
         self.key = key
         self._attr_unique_id = entity_key

@@ -55,7 +55,8 @@ class AmpInstanceEntity(AMPEntity):
     @property
     def instance_data(self) -> AmpExtendedInstance | None:
         """Return this instance's entry in the coordinator data, if present."""
-        return (self.coordinator.data or {}).get(self.index)
+        data = self.coordinator.data
+        return data.instances.get(self.index) if data is not None else None
 
     @property
     def available(self) -> bool:
