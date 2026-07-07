@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.1 (2026-07-07)
+
+### Changed
+
+- Maintainership transferred to @sirjmann92 (fork of the inactive
+  Samywamy10/ha-cubecoders-amp): `codeowners`, `documentation`, and
+  `issue_tracker` in the manifest now point to this fork, and the README
+  documents the current feature set. No functional changes.
+
 ## 1.3.0 (2026-07-07)
 
 ### Added
