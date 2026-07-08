@@ -8,7 +8,7 @@
           "password": "Password"
         },
         "data_description": {
-          "host": "Full URL of the AMP panel including the scheme, e.g. https://amp.example.com or http://192.168.0.185:8080"
+          "host": "Full URL of the AMP panel, starting with http:// or https:// and including the port if it uses one (AMP's default is 8080)."
         }
       },
       "reconfigure": {
@@ -18,7 +18,7 @@
           "password": "Password"
         },
         "data_description": {
-          "host": "Full URL of the AMP panel including the scheme, e.g. https://amp.example.com or http://192.168.0.185:8080"
+          "host": "Full URL of the AMP panel, starting with http:// or https:// and including the port if it uses one (AMP's default is 8080)."
         }
       }
     },
