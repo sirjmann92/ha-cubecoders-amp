@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import STATIC_URL_BASE
 from .entity import AMPEntity
 from .entry import AMPConfigEntry
 
@@ -33,6 +34,17 @@ class AmpPanelUpdateEntity(AMPEntity, UpdateEntity):
         """Initialize the panel update entity."""
         super().__init__(entry.runtime_data.coordinator)
         self._attr_unique_id = f"{entry.entry_id}_amp_panel_update"
+
+    @property
+    def entity_picture(self) -> str:
+        """Return a bundled, theme-neutral AMP logo.
+
+        UpdateEntity's default points at the brand icon's light variant,
+        which is unreadable in dark mode (the frontend never swaps entity
+        pictures per theme). The bundled icon bakes the logo onto a dark
+        chip so it reads on both themes.
+        """
+        return f"{STATIC_URL_BASE}/icon.png"
 
     @property
     def device_info(self) -> DeviceInfo:

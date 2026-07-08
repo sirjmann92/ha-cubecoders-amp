@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from datetime import timedelta
 from logging import Logger, getLogger
+from pathlib import Path
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.loader import async_get_loaded_integration
 
 from .api import AmpApiClient
+from .const import DOMAIN, STATIC_URL_BASE
 from .coordinator import AmpDataUpdateCoordinator
 from .data import AmpData
 from .entry import AMPConfigEntry
@@ -26,6 +29,18 @@ LOGGER: Logger = getLogger(__package__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: AMPConfigEntry) -> bool:
     """Set up AMP from a config entry."""
+
+    # Serve bundled assets (theme-neutral entity pictures). Guarded because
+    # static paths cannot be registered twice across entry reloads.
+    if not hass.data.setdefault(DOMAIN, {}).get("static_registered"):
+        await hass.http.async_register_static_paths(
+            [
+                StaticPathConfig(
+                    STATIC_URL_BASE, str(Path(__file__).parent / "static"), True
+                )
+            ]
+        )
+        hass.data[DOMAIN]["static_registered"] = True
 
     coordinator = AmpDataUpdateCoordinator(
         hass=hass,

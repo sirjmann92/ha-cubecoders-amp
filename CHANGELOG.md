@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.3 (2026-07-07)
+
+### Fixed
+
+- **AMP Panel update entity icon is now readable in dark mode.** The entity
+  previously used Home Assistant's default brand icon (light variant only,
+  never theme-swapped by the frontend), which rendered as a dark logo on a
+  dark background. The integration now bundles a theme-neutral icon — the
+  white AMP logo on a dark chip — and serves it itself, so it reads correctly
+  in both light and dark themes.
+
 ## 1.4.2 (2026-07-07)
 
 ### Fixed
