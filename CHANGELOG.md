@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4.1 (2026-07-07)
+
+### Fixed
+
+- **AMP patch releases now show as available updates.** AMP patches keep the
+  version string (e.g. `2.8.0.0`) and bump only the build number
+  (`20260625.1` → `20260625.2`), so the update entity previously showed
+  "up-to-date" even when AMP offered a patch. The installed version now comes
+  from `Core/GetModuleInfo` (version + running build, matching what AMP's own
+  UI shows) and the latest version includes the update's build, so the two
+  compare correctly. Falls back to the version-only display if module info is
+  unavailable.
+
 ## 1.4.0 (2026-07-07)
 
 ### Added

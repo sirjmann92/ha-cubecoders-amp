@@ -99,6 +99,18 @@ def format_amp_version(version: VersionInfo | str | dict | None) -> str | None:
     return str(version)
 
 
+def join_version_build(version: str | None, build: str | None) -> str | None:
+    """Combine a version string with its build number.
+
+    AMP patches bump only the build (e.g. 20260625.1 -> 20260625.2) while the
+    version string stays the same, so the build must be part of any
+    installed-vs-latest comparison.
+    """
+    if not version:
+        return None
+    return f"{version} ({build})" if build else version
+
+
 class AmpApiClient:
     """AMP API Client."""
 
@@ -351,18 +363,40 @@ class AmpApiClient:
             key: await self._async_get_instance_data(key, instance)
             for key, instance in enumerate(all_instances)
         }
-        panel_version = next(
+        return AmpCoordinatorData(
+            instances=instances,
+            panel_version=await self._async_get_panel_version(all_instances),
+            panel_update=await self._async_get_panel_update(),
+        )
+
+    async def _async_get_panel_version(
+        self, all_instances: list[Instance]
+    ) -> str | None:
+        """Return the panel's running version including its build number.
+
+        Core/GetModuleInfo is the authoritative source because it includes the
+        build; the ADS instance's amp_version (version string only) is the
+        fallback.
+        """
+        try:
+            module = await self.core.get_module_info(format_data=True)
+        except Exception:  # noqa: BLE001 - fall back to the instance list below
+            _LOGGER.debug("Could not fetch AMP module info", exc_info=True)
+        else:
+            version = join_version_build(
+                format_amp_version(getattr(module, "amp_version", None)),
+                getattr(module, "amp_build", None),
+            )
+            if version is not None:
+                return version
+
+        return next(
             (
                 format_amp_version(instance.amp_version)
                 for instance in all_instances
                 if instance.module == "ADS" or instance.friendly_name == "ADS"
             ),
             None,
-        )
-        return AmpCoordinatorData(
-            instances=instances,
-            panel_version=panel_version,
-            panel_update=await self._async_get_panel_update(),
         )
 
     async def _async_get_panel_update(self) -> AmpPanelUpdate | None:
@@ -376,7 +410,9 @@ class AmpApiClient:
             return None
         return AmpPanelUpdate(
             update_available=result.update_available,
-            version=result.version or None,
+            # Include the build so patch releases (same version string, new
+            # build) compare as different from the installed version.
+            version=join_version_build(result.version or None, result.build or None),
             release_notes_url=result.release_notes_url or None,
         )
 
