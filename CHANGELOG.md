@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.2 (2026-07-07)
+
+### Fixed
+
+- **Installed version now includes the running build** (e.g.
+  `2.8.0.0 (20260625.1)`), matching AMP's own UI. 1.4.1 intended this but the
+  `Core/GetModuleInfo` call silently failed: ampapi 1.1.2's `Module` dataclass
+  requires a misspelled field (`end_point_ur`) that AMP never sends, so
+  parsing always raised. The integration now reads the raw GetModuleInfo
+  response instead of the broken dataclass.
+
 ## 1.4.1 (2026-07-07)
 
 ### Fixed

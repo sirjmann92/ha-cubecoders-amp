@@ -377,18 +377,28 @@ class AmpApiClient:
         Core/GetModuleInfo is the authoritative source because it includes the
         build; the ADS instance's amp_version (version string only) is the
         fallback.
+
+        The raw response (format_data=False) is used on purpose: ampapi
+        1.1.2's Module dataclass requires a misspelled field (end_point_ur)
+        that AMP never sends, so parsed GetModuleInfo calls always raise.
         """
         try:
-            module = await self.core.get_module_info(format_data=True)
+            module = await self.core.get_module_info(format_data=False)
         except Exception:  # noqa: BLE001 - fall back to the instance list below
             _LOGGER.debug("Could not fetch AMP module info", exc_info=True)
         else:
-            version = join_version_build(
-                format_amp_version(getattr(module, "amp_version", None)),
-                getattr(module, "amp_build", None),
-            )
-            if version is not None:
-                return version
+            if isinstance(module, dict):
+                # Tolerate PascalCase (raw AMP) and snake_case key styles.
+                fields = {
+                    key.replace("_", "").lower(): value
+                    for key, value in module.items()
+                }
+                version = join_version_build(
+                    fields.get("apiversion") or fields.get("ampversion"),
+                    fields.get("ampbuild"),
+                )
+                if version is not None:
+                    return version
 
         return next(
             (
