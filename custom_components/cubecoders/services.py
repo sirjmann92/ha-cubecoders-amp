@@ -15,8 +15,12 @@ from .const import DOMAIN
 ATTR_INSTANCE = "instance"
 ATTR_COMMAND = "command"
 ATTR_PLAYER = "player"
+ATTR_NAME = "name"
+ATTR_DESCRIPTION = "description"
+ATTR_STICKY = "sticky"
 
 SERVICE_SEND_COMMAND = "send_command"
+SERVICE_TAKE_BACKUP = "take_backup"
 
 COMMAND_SCHEMA = vol.Schema(
     {
@@ -28,6 +32,14 @@ PLAYER_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_INSTANCE): cv.string,
         vol.Required(ATTR_PLAYER): cv.string,
+    }
+)
+BACKUP_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_INSTANCE): cv.string,
+        vol.Optional(ATTR_NAME): cv.string,
+        vol.Optional(ATTR_DESCRIPTION, default=""): cv.string,
+        vol.Optional(ATTR_STICKY, default=False): cv.boolean,
     }
 )
 
@@ -69,6 +81,21 @@ def async_setup_services(hass: HomeAssistant) -> None:
         DOMAIN, SERVICE_SEND_COMMAND, handle_send_command, schema=COMMAND_SCHEMA
     )
 
+    async def handle_take_backup(call: ServiceCall) -> None:
+        try:
+            await _get_client(hass).async_take_backup(
+                call.data[ATTR_INSTANCE],
+                name=call.data.get(ATTR_NAME),
+                description=call.data[ATTR_DESCRIPTION],
+                sticky=call.data[ATTR_STICKY],
+            )
+        except AmpApiClientError as exception:
+            raise HomeAssistantError(str(exception)) from exception
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_TAKE_BACKUP, handle_take_backup, schema=BACKUP_SCHEMA
+    )
+
     def make_mc_handler(action: str):  # noqa: ANN202
         async def handle_mc(call: ServiceCall) -> None:
             try:
@@ -89,5 +116,6 @@ def async_setup_services(hass: HomeAssistant) -> None:
 def async_unload_services(hass: HomeAssistant) -> None:
     """Remove the integration's services."""
     hass.services.async_remove(DOMAIN, SERVICE_SEND_COMMAND)
+    hass.services.async_remove(DOMAIN, SERVICE_TAKE_BACKUP)
     for service_name in MC_SERVICES:
         hass.services.async_remove(DOMAIN, service_name)

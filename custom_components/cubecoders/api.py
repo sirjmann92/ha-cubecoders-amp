@@ -12,6 +12,7 @@ from ampapi import ADSModule, AMPInstance, Bridge, Core
 from ampapi.dataclass import (
     ActionResult,
     APIParams,
+    Backup,
     Instance,
     UpdateInfo,
     Updates,
@@ -70,6 +71,10 @@ class AmpExtendedInstance(AmpBaseInstance):
     uptime: str | None = None
     # Set by the coordinator, which compares consecutive refreshes.
     empty_since: datetime | None = None
+    # None while the instance is stopped or a fetch fails; the coordinator
+    # then carries the previous value forward so the sensor stays useful.
+    last_backup_at: datetime | None = None
+    last_backup_name: str | None = None
 
 
 @dataclass
@@ -204,6 +209,32 @@ class AmpApiClient:
         await self._async_call(
             live_instance.restart_application(format_data=True),
             action="restart application",
+            target=instance_name,
+        )
+
+    async def async_take_backup(
+        self,
+        instance_name: str,
+        name: str | None = None,
+        description: str = "",
+        sticky: bool = False,
+    ) -> None:
+        """Trigger a local backup of a running instance via its backup plugin.
+
+        Like the player list and console, this requires a live session to the
+        instance itself, so it raises a clean AmpApiClientError (rather than
+        AMP's raw "instance not available" ConnectionError) if the instance
+        is stopped.
+        """
+        live_instance = await self._async_get_live_instance(instance_name)
+        await self._async_call(
+            live_instance.take_backup(
+                name=name or "Home Assistant",
+                description=description,
+                sticky=sticky,
+                format_data=True,
+            ),
+            action="take backup",
             target=instance_name,
         )
 
@@ -509,5 +540,28 @@ class AmpApiClient:
         else:
             if isinstance(updates, Updates) and updates.status is not None:
                 data.uptime = updates.status.uptime or None
+
+        try:
+            backups = await live_instance.get_backups(format_data=True)
+        except ConnectionError:
+            _LOGGER.debug(
+                "Instance %s is not ready to report its backup list",
+                instance.friendly_name,
+            )
+        except Exception:  # noqa: BLE001 - one bad instance must not fail the refresh
+            _LOGGER.warning(
+                "Could not fetch the backup list for instance %s",
+                instance.friendly_name,
+                exc_info=True,
+            )
+        else:
+            latest = max(
+                (b for b in backups if isinstance(b, Backup)),
+                key=lambda b: b.timestamp,
+                default=None,
+            )
+            if latest is not None:
+                data.last_backup_at = latest.timestamp
+                data.last_backup_name = latest.name
 
         return data

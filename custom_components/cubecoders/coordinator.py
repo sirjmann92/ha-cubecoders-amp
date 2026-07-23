@@ -41,8 +41,11 @@ class AmpDataUpdateCoordinator(DataUpdateCoordinator[AmpCoordinatorData]):
     def _process_player_transitions(
         self, previous: AmpCoordinatorData | None, new: AmpCoordinatorData
     ) -> None:
-        """Fire join/leave events and track how long each instance has been empty.
+        """Fire join/leave events and carry forward state across refreshes.
 
+        Both "how long has this instance been empty" and "when was its last
+        backup" can only be refreshed while the instance is running, so a
+        stopped instance keeps its previous value instead of losing it.
         Events are only fired when a previous refresh exists, so a Home
         Assistant restart doesn't announce every already-connected player.
         """
@@ -68,6 +71,14 @@ class AmpDataUpdateCoordinator(DataUpdateCoordinator[AmpCoordinatorData]):
                 instance.empty_since = prev.empty_since if was_empty else now
             else:
                 instance.empty_since = None
+
+            if (
+                instance.last_backup_at is None
+                and prev is not None
+                and prev.last_backup_at is not None
+            ):
+                instance.last_backup_at = prev.last_backup_at
+                instance.last_backup_name = prev.last_backup_name
 
             if prev is None:
                 continue

@@ -19,6 +19,42 @@ send_command:
       selector:
         text:
 
+take_backup:
+  name: Take backup
+  description: >-
+    Trigger a local backup of a running instance, with an optional custom
+    title, description, and sticky flag (sticky backups are excluded from
+    automatic pruning).
+  fields:
+    instance:
+      name: Instance
+      description: Friendly or AMP name of the instance (case-insensitive).
+      required: true
+      example: Enshrouded
+      selector:
+        text:
+    name:
+      name: Title
+      description: Title for the backup. Defaults to "Home Assistant".
+      required: false
+      example: Before update
+      selector:
+        text:
+    description:
+      name: Description
+      description: Brief note on why the backup was taken.
+      required: false
+      example: Manual backup before applying a game update
+      selector:
+        text:
+    sticky:
+      name: Sticky
+      description: Exclude this backup from automatic pruning.
+      required: false
+      default: false
+      selector:
+        boolean:
+
 mc_kick_player:
   name: Kick Minecraft player
   description: Kick a player from a running Minecraft instance (by player name).

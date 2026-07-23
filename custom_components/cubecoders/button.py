@@ -56,6 +56,15 @@ async def async_setup_entry(
                     client_method="async_upgrade_instance",
                     device_class=ButtonDeviceClass.UPDATE,
                 ),
+                AmpInstanceButton(
+                    entry,
+                    instance,
+                    device,
+                    name="Take Backup",
+                    key="take_backup",
+                    client_method="async_take_backup",
+                    icon="mdi:content-save-all",
+                ),
             ]
         )
     async_add_entities(entities)

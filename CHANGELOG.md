@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.5.0 (2026-07-08)
+
+### Added
+
+- **Take Backup button** per instance, triggering AMP's local backup plugin
+  (`LocalFileBackupPlugin/TakeBackup`). Like every other per-instance action,
+  this requires the instance to be running — the button is unavailable while
+  stopped, and calling it anyway (e.g. via the new service) raises a clean
+  error instead of AMP's raw "instance not available" crash.
+- **`cubecoders.take_backup` service** for automations that want a custom
+  title, description, or a sticky backup (excluded from AMP's automatic
+  pruning) — the button always takes a plain, non-sticky backup titled "Home
+  Assistant".
+- **Last Backup sensor** per instance, showing the timestamp of its most
+  recent backup. Since the backup list can only be fetched while an instance
+  is running, the sensor keeps its last known value while the instance is
+  stopped instead of going blank — the same carry-forward approach already
+  used for the Empty Since sensor.
+
+### Note
+
+- Taking a backup requires a running instance (same constraint as the player
+  list and console). "Back up before starting a stopped server" isn't
+  possible through this AMP endpoint — the natural place to call it is right
+  after start (once running), or before a stop/restart/update.
+
 ## 1.4.3 (2026-07-07)
 
 ### Fixed

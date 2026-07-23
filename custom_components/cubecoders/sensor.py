@@ -115,6 +115,15 @@ async def async_setup_entry(
                 device_class=SensorDeviceClass.TIMESTAMP,
                 icon="mdi:account-off",
             ),
+            AmpSensor(
+                entry,
+                instance,
+                device,
+                name="Last Backup",
+                key="last_backup_at",
+                device_class=SensorDeviceClass.TIMESTAMP,
+                icon="mdi:content-save-all",
+            ),
         ]
         all_entities.extend(sensor_entities)
 
