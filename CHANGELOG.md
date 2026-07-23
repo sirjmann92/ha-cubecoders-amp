@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.1 (2026-07-23)
+
+### Fixed
+
+- **1.5.0 broke the whole integration.** `get_backups()` returns `None`
+  (not `[]`) for an instance with no backups yet, which crashed the "latest
+  backup" lookup with `TypeError: 'NoneType' object is not iterable` — and
+  because that crash was unguarded, it took the entire coordinator refresh
+  down with it, marking every entity across every instance `unavailable`.
+  Found immediately after deploying 1.5.0 to a live instance.
+
 ## 1.5.0 (2026-07-08)
 
 ### Added

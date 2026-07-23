@@ -555,8 +555,9 @@ class AmpApiClient:
                 exc_info=True,
             )
         else:
+            # AMP returns None (not []) when an instance has no backups yet.
             latest = max(
-                (b for b in backups if isinstance(b, Backup)),
+                (b for b in backups or [] if isinstance(b, Backup)),
                 key=lambda b: b.timestamp,
                 default=None,
             )
