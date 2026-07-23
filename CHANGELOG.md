@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.5.2 (2026-07-23)
+
+### Fixed
+
+- **Last Backup sensor errored on every poll for instances with real
+  backups.** Like the Module dataclass fixed in 1.4.2, ampapi 1.1.2's
+  `Backup` dataclass doesn't accept a field AMP actually sends
+  (`ParentManifest`), so `LocalFileBackupPlugin/GetBackups` raised
+  `TypeError: Backup.__init__() got an unexpected keyword argument
+  'parent_manifest'` for any instance with a backup on record — every
+  refresh cycle, for every running instance. 1.5.1 only fixed the
+  no-backups-yet case; this instance was masked in that first fix because
+  the affected instances happened to have no local backups at the time.
+  Fetches the raw GetBackups response and reads `name`/`timestamp` directly,
+  the same workaround already used for the panel version.
+
 ## 1.5.1 (2026-07-23)
 
 ### Fixed

@@ -12,11 +12,11 @@ from ampapi import ADSModule, AMPInstance, Bridge, Core
 from ampapi.dataclass import (
     ActionResult,
     APIParams,
-    Backup,
     Instance,
     UpdateInfo,
     Updates,
     VersionInfo,
+    timestamp_converter,
 )
 from ampapi.instance import AMPMinecraftInstance
 
@@ -114,6 +114,15 @@ def join_version_build(version: str | None, build: str | None) -> str | None:
     if not version:
         return None
     return f"{version} ({build})" if build else version
+
+
+def normalize_keys(data: dict) -> dict:
+    """Map a raw AMP JSON dict's keys to lowercase, underscore-free lookups.
+
+    Tolerates both AMP's PascalCase and ampapi's snake_case conventions, so
+    callers can do fields.get("someflag") regardless of which one AMP sent.
+    """
+    return {key.replace("_", "").lower(): value for key, value in data.items()}
 
 
 class AmpApiClient:
@@ -419,11 +428,7 @@ class AmpApiClient:
             _LOGGER.debug("Could not fetch AMP module info", exc_info=True)
         else:
             if isinstance(module, dict):
-                # Tolerate PascalCase (raw AMP) and snake_case key styles.
-                fields = {
-                    key.replace("_", "").lower(): value
-                    for key, value in module.items()
-                }
+                fields = normalize_keys(module)
                 version = join_version_build(
                     fields.get("apiversion") or fields.get("ampversion"),
                     fields.get("ampbuild"),
@@ -542,7 +547,11 @@ class AmpApiClient:
                 data.uptime = updates.status.uptime or None
 
         try:
-            backups = await live_instance.get_backups(format_data=True)
+            # Raw response (format_data=False) is used on purpose: ampapi
+            # 1.1.2's Backup dataclass doesn't accept a field AMP actually
+            # sends (ParentManifest), so parsed GetBackups calls raise for
+            # any instance that has a real backup to report.
+            backups = await live_instance.get_backups(format_data=False)
         except ConnectionError:
             _LOGGER.debug(
                 "Instance %s is not ready to report its backup list",
@@ -556,13 +565,16 @@ class AmpApiClient:
             )
         else:
             # AMP returns None (not []) when an instance has no backups yet.
+            normalized = [
+                normalize_keys(b) for b in backups or [] if isinstance(b, dict)
+            ]
             latest = max(
-                (b for b in backups or [] if isinstance(b, Backup)),
-                key=lambda b: b.timestamp,
+                (b for b in normalized if b.get("timestamp")),
+                key=lambda b: timestamp_converter(b["timestamp"]),
                 default=None,
             )
             if latest is not None:
-                data.last_backup_at = latest.timestamp
-                data.last_backup_name = latest.name
+                data.last_backup_at = timestamp_converter(latest["timestamp"])
+                data.last_backup_name = latest.get("name")
 
         return data
