@@ -89,7 +89,7 @@ class AmpInstanceButton(AmpInstanceEntity, ButtonEntity):
         self._client = entry.runtime_data.client
         self._client_method = client_method
         self._attr_unique_id = (
-            f"{instance.instance_index}_{instance.instance_name}_{key}"
+            f"{instance.instance_id}_{key}"
         )
         self._attr_name = f"{instance.instance_name} {name}"
         self._attr_device_class = device_class

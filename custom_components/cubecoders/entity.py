@@ -12,7 +12,7 @@ from .coordinator import AmpDataUpdateCoordinator
 def build_device_info(instance: AmpBaseInstance) -> DeviceInfo:
     """Build the device registry entry shared by all of an instance's entities."""
     return DeviceInfo(
-        identifiers={("cubecoders", instance.instance_name)},
+        identifiers={("cubecoders", instance.instance_id)},
         name=instance.instance_name,
         manufacturer="CubeCoders",
     )
@@ -48,7 +48,7 @@ class AmpInstanceEntity(AMPEntity):
     ) -> None:
         """Initialize the per-instance entity."""
         super().__init__(coordinator)
-        self.index = instance.instance_index
+        self.instance_id = instance.instance_id
         self.amp_instance_name = instance.amp_instance_name
         self.device = device
 
@@ -56,7 +56,7 @@ class AmpInstanceEntity(AMPEntity):
     def instance_data(self) -> AmpExtendedInstance | None:
         """Return this instance's entry in the coordinator data, if present."""
         data = self.coordinator.data
-        return data.instances.get(self.index) if data is not None else None
+        return data.instances.get(self.instance_id) if data is not None else None
 
     @property
     def available(self) -> bool:
