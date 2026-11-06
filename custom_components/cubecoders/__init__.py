@@ -12,11 +12,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.loader import async_get_loaded_integration
 
 from .api import AmpApiClient
-from .const import DOMAIN, STATIC_URL_BASE
+from .const import CONF_TOTP_SECRET, DOMAIN, STATIC_URL_BASE
 from .coordinator import AmpDataUpdateCoordinator
 from .data import AmpData
 from .entry import AMPConfigEntry
 from .services import async_setup_services, async_unload_services
+from .twofactor import set_secret
 
 _PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -49,6 +50,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: AMPConfigEntry) -> bool:
         config_entry=entry,
         update_interval=timedelta(minutes=1),
     )
+
+    # Must be set before the first API call; empty means no 2FA.
+    set_secret(entry.data.get(CONF_TOTP_SECRET, ""))
 
     entry.runtime_data = AmpData(
         coordinator=coordinator,

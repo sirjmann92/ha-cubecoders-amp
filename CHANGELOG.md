@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Optional two-factor (2FA) login.** A new optional *2FA secret* field in
+  setup and reconfigure accepts the TOTP setup key from AMP's 2FA enrollment
+  (or the `otpauth://` link from its QR code). ampapi 1.1.2's own 2FA option
+  can't log in (with `use_2fa` set it generates a code but skips the
+  `Core/Login` call, and it expects the secret wrapped in quotes it never
+  strips), so the integration supplies its own login: it reuses valid
+  sessions, prefers AMP remember-me tokens so a fresh code is rarely
+  needed, and waits for the next code if AMP refuses one that was already
+  used. Leaving the field empty keeps the previous behaviour exactly.
+- Tests (`pytest`, using `pytest-homeassistant-custom-component`).
+
 ## 1.5.2 (2026-07-23)
 
 ### Fixed
