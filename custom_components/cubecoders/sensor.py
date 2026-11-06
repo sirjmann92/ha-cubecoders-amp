@@ -148,7 +148,7 @@ class AmpSensor(AmpInstanceEntity, SensorEntity):
     ) -> None:
         """Initialize the sensor class."""
         super().__init__(entry.runtime_data.coordinator, instance, device)
-        entity_key = f"{instance.instance_index}_{instance.instance_name}_{key}"
+        entity_key = f"{instance.instance_id}_{key}"
         self.entity_description = SensorEntityDescription(
             key=entity_key,
             name=f"{instance.instance_name} {name}",

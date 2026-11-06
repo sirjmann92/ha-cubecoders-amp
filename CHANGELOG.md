@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Entities showed the wrong instance's data after instances were added or
+  removed.** Instances were keyed by their position in AMP's (alphabetical)
+  instance list, so creating an instance that sorted before others shifted
+  every later instance by one: sensors and switch states reported their
+  neighbour's data until Home Assistant restarted, and after a restart the
+  shifted entities got new unique ids (and `_2` entity ids). Instances are
+  now keyed by AMP's permanent instance id. Existing entities and devices
+  are migrated in place on first load, so entity ids, history and area
+  assignments are kept.
+
+### Added
+
+- **New, removed and renamed AMP instances are picked up automatically.**
+  Each refresh compares the instance list with the one entities were built
+  from and reloads the integration when it changes, so a new instance gets
+  its device and entities within a minute and a deleted instance's device
+  is removed.
+- Tests (`pytest`, using `pytest-homeassistant-custom-component`).
+
 ## 1.5.2 (2026-07-23)
 
 ### Fixed

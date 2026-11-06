@@ -45,12 +45,15 @@ class AmpBaseInstance:
 
     instance_name is the friendly (display) name and is part of entity unique
     ids; amp_instance_name is the real AMP instance name, which is what the
-    ADSModule start/stop/restart endpoints expect.
+    ADSModule start/stop/restart endpoints expect. instance_id is AMP's
+    permanent GUID for the instance and is what entities are keyed on, so
+    adding, removing or renaming instances never shifts data between them.
     """
 
     instance_name: str
     instance_index: int
     amp_instance_name: str
+    instance_id: str
 
 
 @dataclass
@@ -90,7 +93,7 @@ class AmpPanelUpdate:
 class AmpCoordinatorData:
     """Everything one coordinator refresh collects."""
 
-    instances: dict[int, AmpExtendedInstance]
+    instances: dict[str, AmpExtendedInstance]  # keyed by AMP instance_id
     panel_version: str | None
     panel_update: AmpPanelUpdate | None
 
@@ -164,6 +167,7 @@ class AmpApiClient:
                 instance_name=instance.friendly_name,
                 instance_index=index,
                 amp_instance_name=instance.instance_name,
+                instance_id=instance.instance_id,
             )
             for index, instance in enumerate(instances)
         ]
@@ -400,7 +404,7 @@ class AmpApiClient:
             raise AmpApiClientCommunicationError(msg) from exception
 
         instances = {
-            key: await self._async_get_instance_data(key, instance)
+            instance.instance_id: await self._async_get_instance_data(key, instance)
             for key, instance in enumerate(all_instances)
         }
         return AmpCoordinatorData(
@@ -476,6 +480,7 @@ class AmpApiClient:
             instance_name=instance.friendly_name,
             instance_index=key,
             amp_instance_name=instance.instance_name,
+            instance_id=instance.instance_id,
             active_users=(
                 metrics.active_users.get("raw_value", 0)
                 if metrics and metrics.active_users
