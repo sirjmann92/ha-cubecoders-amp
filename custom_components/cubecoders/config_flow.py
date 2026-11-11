@@ -11,7 +11,6 @@ import aiohttp
 import voluptuous as vol
 from ampapi import ADSModule, Bridge
 from ampapi.dataclass import APIParams
-
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant

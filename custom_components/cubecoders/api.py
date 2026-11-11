@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 import socket
 from dataclasses import dataclass, field
-from datetime import datetime  # noqa: TC003 - used in dataclass field annotation
+from datetime import datetime
+from typing import ClassVar
 
 import aiohttp
 from ampapi import ADSModule, AMPInstance, Bridge, Core
@@ -262,13 +263,13 @@ class AmpApiClient:
 
     # Minecraft actions that require the player's full UUID; resolved from the
     # live player list so callers can pass a plain player name.
-    _MC_UUID_ACTIONS = {
+    _MC_UUID_ACTIONS: ClassVar[dict[str, str]] = {
         "kick": "mc_kick_user_by_id",
         "ban": "mc_ban_user_by_id",
         "smite": "mc_smite_by_id",
     }
     # Minecraft actions that accept a player name (or UUID) directly.
-    _MC_NAME_ACTIONS = {
+    _MC_NAME_ACTIONS: ClassVar[dict[str, str]] = {
         "whitelist_add": "mc_add_to_whitelist",
         "whitelist_remove": "mc_remove_whitelist_entry",
         "op": "mc_add_op_entry",
@@ -351,7 +352,7 @@ class AmpApiClient:
         cls = AMPMinecraftInstance if match.module == "Minecraft" else AMPInstance
         return cls(match)
 
-    async def _async_call(self, coro, action: str, target: str):  # noqa: ANN001, ANN202
+    async def _async_call(self, coro, action: str, target: str):
         """Await an ampapi call, mapping errors and refused ActionResults."""
         try:
             result = await coro
@@ -428,7 +429,7 @@ class AmpApiClient:
         """
         try:
             module = await self.core.get_module_info(format_data=False)
-        except Exception:  # noqa: BLE001 - fall back to the instance list below
+        except Exception:
             _LOGGER.debug("Could not fetch AMP module info", exc_info=True)
         else:
             if isinstance(module, dict):
@@ -453,7 +454,7 @@ class AmpApiClient:
         """Fetch AMP panel update availability; None if it cannot be determined."""
         try:
             result = await self.core.get_update_info(format_data=True)
-        except Exception:  # noqa: BLE001 - purely informational, never fail the refresh
+        except Exception:
             _LOGGER.debug("Could not fetch AMP panel update info", exc_info=True)
             return None
         if not isinstance(result, UpdateInfo):
@@ -528,7 +529,7 @@ class AmpApiClient:
                 "Instance %s is not ready to report a player list",
                 instance.friendly_name,
             )
-        except Exception:  # noqa: BLE001 - one bad instance must not fail the refresh
+        except Exception:
             _LOGGER.warning(
                 "Could not fetch the player list for instance %s;"
                 " reporting it without player data",
@@ -562,7 +563,7 @@ class AmpApiClient:
                 "Instance %s is not ready to report its backup list",
                 instance.friendly_name,
             )
-        except Exception:  # noqa: BLE001 - one bad instance must not fail the refresh
+        except Exception:
             _LOGGER.warning(
                 "Could not fetch the backup list for instance %s",
                 instance.friendly_name,

@@ -14,6 +14,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/ruff-action@v3
         with:
+          # Pinned: the action defaults to the latest ruff, whose default rule
+          # set changes between releases and can fail CI with no code change.
+          version: "0.17.4"
           args: check custom_components/
 
   validate:
