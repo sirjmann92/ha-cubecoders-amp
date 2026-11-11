@@ -1,1 +1,7 @@
 pytest-homeassistant-custom-component
+# The integration's own runtime requirements (see manifest.json), plus pyotp:
+# a running Home Assistant has it, but a bare test install does not, and
+# ampapi imports it unconditionally.
+cc-ampapi==1.1.2
+dataclass-wizard==0.34.0
+pyotp

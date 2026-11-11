@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 1.6.0 (2026-11-11)
+
+Both headline changes in this release were contributed by
+[@Ratguy33](https://github.com/Ratguy33) (#4, #5) — thank you!
+
+> **Upgrading:** on first load the integration rewrites existing entities'
+> unique ids and devices' identifiers in place (entity ids, history and area
+> assignments are kept). Only entities whose stored list position still matches
+> AMP's current instance list can be migrated; any that were already shifted by
+> the old position-based keying will show up as unavailable/orphaned and can be
+> removed from the entity registry.
 
 ### Added
 
