@@ -25,6 +25,8 @@ class AmpDataUpdateCoordinator(DataUpdateCoordinator[AmpCoordinatorData]):
     """Class to manage fetching data from the API."""
 
     config_entry: AMPConfigEntry
+    # instance_id -> friendly name, as of when the entities were created.
+    known_instances: dict[str, str] | None = None
 
     async def _async_update_data(self) -> Any:
         """Update data via library."""
@@ -36,7 +38,30 @@ class AmpDataUpdateCoordinator(DataUpdateCoordinator[AmpCoordinatorData]):
             raise UpdateFailed(exception) from exception
 
         self._process_player_transitions(previous=self.data, new=data)
+        self._reload_if_instances_changed(data)
         return data
+
+    def _reload_if_instances_changed(self, data: AmpCoordinatorData) -> None:
+        """Reload the entry when instances are added, removed or renamed.
+
+        Entities are only created at setup, so a reload is what gives a new
+        AMP instance its device and entities (and retires deleted ones).
+        """
+        current = {iid: inst.instance_name for iid, inst in data.instances.items()}
+        if self.known_instances is None:
+            self.known_instances = current
+            return
+        if current == self.known_instances:
+            return
+        added = sorted(set(current.values()) - set(self.known_instances.values()))
+        removed = sorted(set(self.known_instances.values()) - set(current.values()))
+        self.logger.info(
+            "AMP instances changed (added/renamed: %s, removed/renamed: %s); reloading",
+            added or "none",
+            removed or "none",
+        )
+        self.known_instances = current
+        self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
 
     def _process_player_transitions(
         self, previous: AmpCoordinatorData | None, new: AmpCoordinatorData

@@ -51,7 +51,7 @@ class AmpInstanceSwitch(AmpInstanceEntity, SwitchEntity):
         super().__init__(entry.runtime_data.coordinator, instance, device)
         self._client = entry.runtime_data.client
         self._attr_unique_id = (
-            f"{instance.instance_index}_{instance.instance_name}_instance_running"
+            f"{instance.instance_id}_instance_running"
         )
         self._attr_name = f"{instance.instance_name} Instance"
 
@@ -103,7 +103,7 @@ class AmpApplicationSwitch(AmpInstanceEntity, SwitchEntity):
         super().__init__(entry.runtime_data.coordinator, instance, device)
         self._client = entry.runtime_data.client
         self._attr_unique_id = (
-            f"{instance.instance_index}_{instance.instance_name}_application_running"
+            f"{instance.instance_id}_application_running"
         )
         self._attr_name = f"{instance.instance_name} Application"
 
