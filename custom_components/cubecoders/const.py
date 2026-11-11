@@ -7,3 +7,5 @@ CONF_TOTP_SECRET = "totp_secret"
 
 # URL base for assets bundled with the integration (registered in __init__).
 STATIC_URL_BASE = "/cubecoders_static"
+# hass.data[DOMAIN] key: entry id -> device ids missing from the last poll.
+STALE_DEVICES_KEY = "stale_devices"

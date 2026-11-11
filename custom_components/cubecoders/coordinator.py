@@ -10,6 +10,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import AmpApiClientAuthenticationError, AmpApiClientError, AmpCoordinatorData
+from .devices import async_remove_stale_devices
 
 if TYPE_CHECKING:
     from .data import AmpData
@@ -39,6 +40,9 @@ class AmpDataUpdateCoordinator(DataUpdateCoordinator[AmpCoordinatorData]):
 
         self._process_player_transitions(previous=self.data, new=data)
         self._reload_if_instances_changed(data)
+        # The first refresh is checked by setup itself, once migration has run.
+        if self.data is not None:
+            async_remove_stale_devices(self.hass, self.config_entry, data)
         return data
 
     def _reload_if_instances_changed(self, data: AmpCoordinatorData) -> None:

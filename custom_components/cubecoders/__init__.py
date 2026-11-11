@@ -14,9 +14,10 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.loader import async_get_loaded_integration
 
 from .api import AmpApiClient, AmpCoordinatorData
-from .const import CONF_TOTP_SECRET, DOMAIN, STATIC_URL_BASE
+from .const import CONF_TOTP_SECRET, DOMAIN, STALE_DEVICES_KEY, STATIC_URL_BASE
 from .coordinator import AmpDataUpdateCoordinator
 from .data import AmpData
+from .devices import async_get_entry_device, async_remove_stale_devices
 from .entry import AMPConfigEntry
 from .services import async_setup_services, async_unload_services
 from .twofactor import set_secret
@@ -68,7 +69,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AMPConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
     _async_migrate_to_instance_ids(hass, entry, coordinator.data)
-    _async_remove_stale_devices(hass, entry, coordinator.data)
+    async_remove_stale_devices(hass, entry, coordinator.data)
     await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
     async_setup_services(hass)
 
@@ -124,19 +125,15 @@ def _async_migrate_to_instance_ids(
     for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
         for domain, ident in device.identifiers:
             iid = name_to_id.get(ident) if domain == DOMAIN else None
-            if iid and iid != ident and not dev_reg.async_get_device({(DOMAIN, iid)}):
+            if (
+                iid
+                and iid != ident
+                and not async_get_entry_device(dev_reg, entry, (DOMAIN, iid))
+            ):
                 dev_reg.async_update_device(device.id, new_identifiers={(DOMAIN, iid)})
                 break
 
 
-@callback
-def _async_remove_stale_devices(
-    hass: HomeAssistant, entry: AMPConfigEntry, data: AmpCoordinatorData
-) -> None:
-    """Remove devices for AMP instances that no longer exist."""
-    keep = {(DOMAIN, iid) for iid in data.instances}
-    keep |= {(DOMAIN, "amp_panel"), (DOMAIN, entry.entry_id)}
-    dev_reg = dr.async_get(hass)
-    for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
-        if not device.identifiers & keep:
-            dev_reg.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+async def async_remove_entry(hass: HomeAssistant, entry: AMPConfigEntry) -> None:
+    """Forget the stale-device memory of a deleted config entry."""
+    hass.data.get(DOMAIN, {}).get(STALE_DEVICES_KEY, {}).pop(entry.entry_id, None)
