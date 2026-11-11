@@ -61,7 +61,7 @@ class FakeAMP:
     async def call_api(self, api_self, api, parameters=None, **_kwargs):
         if api == "Core/Login":
             return self._login(parameters)
-        session = api_self._bridge._sessions.get(api_self.instance_id)  # noqa: SLF001
+        session = api_self._bridge._sessions.get(api_self.instance_id)
         if session is None or session.id not in self.sessions:
             raise PermissionError("Unauthorized Access")
         return {"ok": True}
@@ -101,9 +101,9 @@ def amp(monkeypatch):
         bridge = Bridge(
             api_params=APIParams(url="http://amp:8080", user="ha", password=PASSWORD)
         )
-        bridge._sessions.clear()  # noqa: SLF001
-        twofactor._remember_tokens.clear()  # noqa: SLF001
-        twofactor._state["last_code"] = None  # noqa: SLF001
+        bridge._sessions.clear()
+        twofactor._remember_tokens.clear()
+        twofactor._state["last_code"] = None
         twofactor.set_secret(secret)
         return fake
 
@@ -122,7 +122,7 @@ async def test_login_with_code_then_session_then_remember_token(amp) -> None:
     await core.call_end_point("Core/GetStatus")
     assert fake.log == ["totp"]  # valid session reused
 
-    core._bridge._sessions["0"].ttl = datetime(2000, 1, 1)  # noqa: SLF001
+    core._bridge._sessions["0"].ttl = datetime(2000, 1, 1)
     await core.call_end_point("Core/GetStatus")
     assert fake.log == ["totp", "remember"]  # no new 2FA code needed
 
@@ -166,5 +166,5 @@ async def test_no_secret_uses_library_login(amp, monkeypatch) -> None:
         called.append(True)
 
     monkeypatch.setattr(twofactor, "_ORIGINAL_CONNECT", original)
-    await twofactor._connect(Core())  # noqa: SLF001
+    await twofactor._connect(Core())
     assert called == [True]
