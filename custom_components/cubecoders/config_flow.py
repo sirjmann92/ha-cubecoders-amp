@@ -16,7 +16,8 @@ from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN
+from .const import CONF_TOTP_SECRET, DOMAIN
+from .twofactor import InvalidTotpSecret, normalize_secret, set_secret
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_HOST): str,
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
+        vol.Optional(CONF_TOTP_SECRET, default=""): str,
     }
 )
 
@@ -49,6 +51,11 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
     data[CONF_HOST] = normalize_host(data[CONF_HOST])
+    try:
+        data[CONF_TOTP_SECRET] = normalize_secret(data.get(CONF_TOTP_SECRET))
+    except InvalidTotpSecret as exception:
+        raise InvalidTotp from exception
+    set_secret(data[CONF_TOTP_SECRET])
 
     # Bridge is a process-wide singleton in ampapi; the entry is reloaded
     # after a successful (re)configure, so it picks these params back up.
@@ -89,6 +96,8 @@ class AMPConfigFlow(ConfigFlow, domain=DOMAIN):
             info = await validate_input(self.hass, user_input)
         except InvalidHost:
             errors[CONF_HOST] = "invalid_host"
+        except InvalidTotp:
+            errors[CONF_TOTP_SECRET] = "invalid_totp"
         except CannotConnect:
             errors["base"] = "cannot_connect"
         except InvalidAuth:
@@ -140,6 +149,10 @@ class AMPConfigFlow(ConfigFlow, domain=DOMAIN):
 
 class InvalidHost(HomeAssistantError):
     """Error to indicate the host is not a valid http(s) URL."""
+
+
+class InvalidTotp(HomeAssistantError):
+    """Error to indicate the 2FA secret is not a valid TOTP secret."""
 
 
 class CannotConnect(HomeAssistantError):

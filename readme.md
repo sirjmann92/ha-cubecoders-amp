@@ -81,11 +81,13 @@ Install via [HACS by adding a custom repository](https://www.hacs.xyz/docs/faq/c
 | host | `http://192.168.86.194:8080` or `https://amp.example.com` — must be a full URL including `http://` or `https://` |
 | username | `<yourAmpAdminUsername>` |
 | password | `<yourAmpAdminPassword>` |
+| 2FA secret (optional) | Only if the AMP user requires two-factor login: the setup key from AMP's 2FA enrollment, or the full `otpauth://` link from its QR code — not a 6-digit code |
 
 The integration supports reconfiguration from the integration page (no need to delete and re-add to change host or credentials).
 
 ### Notes
 
+- **Two-factor login:** with a 2FA secret set, the integration generates the current code itself. Home Assistant's clock must be accurate (codes are time-based), and the secret is stored in Home Assistant's config entry like the password, so 2FA effectively becomes a second password for this account — a dedicated AMP user with only the permissions you need is a good idea.
 - The **Instance** switch controls AMP's managed process; the **Application** switch controls the game server inside it. If your instance is configured to auto-start its application, the Instance switch alone gives you full one-toggle spin-up.
 - Services accept the instance's friendly name or AMP instance name, case-insensitively — voice-assistant friendly.
 - Kick/ban/smite require the player to be currently online (their UUID is resolved from the live player list); whitelist and op/de-op work for offline players too.
