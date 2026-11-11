@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
@@ -96,7 +95,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         DOMAIN, SERVICE_TAKE_BACKUP, handle_take_backup, schema=BACKUP_SCHEMA
     )
 
-    def make_mc_handler(action: str):  # noqa: ANN202
+    def make_mc_handler(action: str):
         async def handle_mc(call: ServiceCall) -> None:
             try:
                 await _get_client(hass).async_mc_player_action(

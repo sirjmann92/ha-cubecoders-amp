@@ -14,13 +14,12 @@ from .api import AmpApiClientError, AmpBaseInstance
 from .entity import AmpInstanceEntity, build_device_info
 from .entry import AMPConfigEntry
 
-
 # App states that mean the application is up or on its way up/down.
 ACTIVE_APP_STATES = {"starting", "ready", "restarting", "stopping"}
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,  # noqa: ARG001 Unused function argument: `hass`
+    hass: HomeAssistant,
     entry: AMPConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:

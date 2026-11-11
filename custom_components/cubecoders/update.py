@@ -13,7 +13,7 @@ from .entry import AMPConfigEntry
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,  # noqa: ARG001 Unused function argument: `hass`
+    hass: HomeAssistant,
     entry: AMPConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
