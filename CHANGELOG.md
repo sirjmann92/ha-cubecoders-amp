@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Home Assistant 2026.11 deprecation warnings.** The instance-id migration
+  and stale-device cleanup no longer use `device_registry.async_get_device`
+  or `async_update_device(remove_config_entry_id=...)`, which stop working in
+  Home Assistant 2027.8.0. They use the entry-scoped lookup and
+  `async_remove_device` where available and fall back to the old calls on
+  older Home Assistant (the minimum supported version is unchanged).
+
+### Changed
+
+- A device for a vanished AMP instance is now only removed after it has been
+  missing from two consecutive polls, so a single short or incomplete answer
+  from AMP can no longer delete devices together with their entity names and
+  areas. A genuinely deleted instance is still cleaned up, within a minute.
+
 ## 1.6.0 (2026-11-11)
 
 Both headline changes in this release were contributed by
